@@ -48,7 +48,7 @@ footer .a{color:#e6d9ae;font-weight:800;font-size:18px}footer small{display:bloc
 <div class="card"><h2>بيانات الطالب</h2><div class="fg">
 <div><label>المعدل المئوي %</label><input id="avg" type="number" min="0" max="100" step="0.01" placeholder="مثال: 82.5"></div>
 <div><label>المحافظة</label><select id="gov"></select></div>
-<div><label>نوع المفاضلة</label><select id="trk"><option value="0">عامة</option><option value="1">التعليم الموازي</option><option value="2">الهيئة التدريسية</option></select></div>
+<div><label>نوع المفاضلة</label><select id="trk"><option value="0">عامة</option><option value="1">التعليم الموازي</option><option value="3">عامة + موازي (مع التمييز)</option><option value="2">الهيئة التدريسية</option></select></div>
 <div><label>نوع المؤسسة</label><select id="ty"><option value="">كليات + معاهد</option><option value="c">كليات فقط</option><option value="i">معاهد فقط</option></select></div><div><label>عرض</label><select id="show"><option value="ne">متاح + قريب من معدلي</option><option value="ok">المتاح فقط</option><option value="all">الكل</option></select></div>
 <div><label>ترتيب النتائج</label><select id="sort"><option value="near">الأقرب لمعدلي</option><option value="hi">الحد الأدنى: الأعلى أولاً</option><option value="lo">الحد الأدنى: الأقل أولاً</option><option value="gov">المحافظة</option><option value="n">اسم الاختصاص</option></select></div>
 <div><label>بحث (اختصاص / محافظة)</label><input id="q" placeholder="ابحث..."></div></div></div>
@@ -275,8 +275,8 @@ function setB(b){B=b;$('tsci').classList.toggle('on',b==='sci');$('tlit').classL
 const avg=()=>parseFloat($('avg').value),trk=()=>+$('trk').value;
 function stat(d,t){const a=avg(),m=d.m[t===undefined?trk():t];if(isNaN(a))return{s:'x',df:null,m};const df=+(a-m).toFixed(2);return{s:df>=0?'ok':df>=-3?'nr':'no',df,m}}
 function draw(){
-const t=trk(),a=avg(),ty=$('ty').value,q=$('q').value.trim(),g=$('gov').value;
-let L=D[B].filter(d=>d.m[t]>=0&&(!ty||(ty==='i')===d.inst)&&(!g||d.c===g)&&(!q||(d.n+' '+d.c).includes(q))).map(d=>({d,...stat(d)}));
+const t=trk(),mix=t===3,TR=mix?[0,1]:[t],a=avg(),ty=$('ty').value,q=$('q').value.trim(),g=$('gov').value;
+let L=D[B].filter(d=>TR.some(k=>d.m[k]>=0)&&(!ty||(ty==='i')===d.inst)&&(!g||d.c===g)&&(!q||(d.n+' '+d.c).includes(q))).map(d=>{const rk={ok:0,nr:1,x:2,no:3},subs=TR.filter(k=>d.m[k]>=0).map(k=>({k,...stat(d,k)})),b=subs.slice().sort((p,q)=>rk[p.s]-rk[q.s]||p.m-q.m)[0];return{d,subs,s:b.s,df:b.df,m:b.m}});
 const all=L,sh=$('show').value;
 if(!isNaN(a)){if(sh==='ok')L=L.filter(x=>x.s==='ok');else if(sh==='ne')L=L.filter(x=>x.s!=='no')}
 const so=$('sort').value;
@@ -285,18 +285,18 @@ const ok=all.filter(x=>x.s==='ok');
 $('st').innerHTML=[[ok.length,'اختصاص متاح'],[new Set(ok.map(x=>x.d.c)).size,'جامعة/محافظة متاحة'],[ok.filter(x=>x.d.inst).length,'معهد متاح'],[g?ok.length:(ok.filter(x=>x.d.c===g).length),'نتائج المحافظة المحددة'],[ok.length?Math.max(...ok.map(x=>x.m))+'%':'—','أعلى حد أدنى متاح'],[ST.w[B].length,'رغباتي']].map(x=>`<div><b>${x[0]}</b><span>${x[1]}</span></div>`).join('');
 $('rt').textContent='النتائج — الفرع '+BN[B]+' ('+L.length+')';
 const lb={ok:'متاح لك',nr:'قريب من معدلك',no:'غير متاح',x:'أدخل معدلك'};
-$('res').innerHTML=L.slice(0,150).map(({d,s,df,m})=>`<div class="it"><div class="row"><h3>${esc(d.n)}</h3><span class="bd ${s==='x'?'no':s}">${lb[s]}</span></div><div class="mt">${esc(d.c)} — الفرع ${BN[B]} — ${TN[t]}</div><div class="mt">الحد الأدنى: <b>${fm(m)}</b>${df===null||m===0?'':' — معدلك: '+a+'% — الفرق: <b dir="ltr">'+(df>0?'+':'')+df+'%</b>'}</div>${NOTE[d.n]?'<div class="mt" style="color:var(--nr)">ملاحظة: '+NOTE[d.n]+'</div>':''}<div class="row"><button class="b" onclick="addW('${d.id}')">إضافة إلى رغباتي</button><button class="b o" onclick="addF('${d.id}')">إضافة إلى المفضلة</button></div></div>`).join('')||'<p class="mt">لا توجد نتائج. أدخل معدلك أو غيّر الفلاتر.</p>';
+$('res').innerHTML=L.slice(0,150).map(({d,s,subs})=>`<div class="it"><div class="row"><h3>${esc(d.n)}</h3><span class="bd ${s==='x'?'no':s}">${lb[s]}</span></div><div class="mt">${esc(d.c)} — الفرع ${BN[B]}${d.inst?' — معهد':''}</div>${subs.map(u=>`<div class="mt" style="border-top:1px dashed var(--bd);padding-top:3px"><b>${TN[u.k]}</b>: الحد الأدنى <b>${fm(u.m)}</b>${u.df===null||u.m===0?'':' — معدلك '+a+'% — الفرق <b dir="ltr">'+(u.df>0?'+':'')+u.df+'%</b>'} <span class="bd ${u.s==='x'?'no':u.s}">${lb[u.s]}</span> <button class="b" onclick="addW('${d.id}',${u.k})">إضافة ${mix?'('+TN[u.k]+') ':''}إلى رغباتي</button></div>`).join('')}${mix&&subs.length>1?'<div class="mt" style="color:var(--nr)">تنبيه: المفاضلة العامة والتعليم الموازي مساران منفصلان بحدّين مختلفين، وتُسجَّل الرغبة في أحدهما.</div>':''}${NOTE[d.n]?'<div class="mt" style="color:var(--nr)">ملاحظة: '+NOTE[d.n]+'</div>':''}<div class="row"><button class="b o" onclick="addF('${d.id}')">إضافة إلى المفضلة</button></div></div>`).join('')||'<p class="mt">لا توجد نتائج. أدخل معدلك أو غيّر الفلاتر.</p>';
 if(L.length>150)$('res').innerHTML+='<p class="mt">يعرض أول 150 نتيجة، استخدم البحث للتضييق.</p>';
 wl();
 }
-function addW(id){const d=byId(id),a=avg();if(isNaN(a))return toast('أدخل معدلك أولاً');if(d.id[0]!==B[0]&&d.id.split('|')[0]!==B)return toast('الاختصاص لا يتبع فرعك');
-if(stat(d).s!=='ok')return toast('هذا الاختصاص غير متاح حاليًا وفق المعدل المدخل.');
+function addW(id,t){const d=byId(id),a=avg();if(isNaN(a))return toast('أدخل معدلك أولاً');if(d.id[0]!==B[0]&&d.id.split('|')[0]!==B)return toast('الاختصاص لا يتبع فرعك');
+if(stat(d,t).s!=='ok')return toast('هذا الاختصاص غير متاح حاليًا وفق المعدل المدخل.');
 if(ST.w[B].some(w=>w.id===id))return toast('هذه الرغبة مضافة مسبقًا');
-ST.w[B].push({id,t:trk()});sv();draw();toast('أُضيفت إلى رغباتك')}
+ST.w[B].push({id,t});sv();draw();toast('أُضيفت إلى رغباتك')}
 function addF(id){if(ST.f.includes(id))return toast('موجود في المفضلة');ST.f.push(id);sv();draw()}
 let dr=null;
 function wl(){const W=ST.w[B];$('wl').innerHTML=W.map((w,i)=>{const d=byId(w.id);return`<div class="wi" draggable="true" ondragstart="dr=${i}" ondragover="event.preventDefault()" ondrop="mv(dr,${i})"><span class="n">${i+1}</span><div class="t">${esc(d.n)}<br><span class="mt">${esc(d.c)} — ${TN[w.t]} — ${fm(d.m[w.t])}</span></div><button class="b o" onclick="mv(${i},${i-1})">▲</button><button class="b o" onclick="mv(${i},${i+1})">▼</button><button class="b r" onclick="rm(${i})">✕</button></div>`}).join('')||'<p class="mt">لم تختر رغبات بعد.</p>';
-$('fl').innerHTML=ST.f.filter(id=>id.startsWith(B+'|')).map(id=>{const d=byId(id);return`<div class="wi" style="cursor:auto"><div class="t">${esc(d.n)}<br><span class="mt">${esc(d.c)} — ${fm(d.m[trk()])}</span></div><button class="b r" onclick="ST.f=ST.f.filter(x=>x!=='${id}');sv();draw()">✕</button></div>`}).join('')||'<p class="mt">لا توجد تخصصات مفضلة.</p>'}
+$('fl').innerHTML=ST.f.filter(id=>id.startsWith(B+'|')).map(id=>{const d=byId(id);return`<div class="wi" style="cursor:auto"><div class="t">${esc(d.n)}<br><span class="mt">${esc(d.c)} — ${trk()===3?fm(d.m[0])+' / موازي '+fm(d.m[1]):fm(d.m[trk()])}</span></div><button class="b r" onclick="ST.f=ST.f.filter(x=>x!=='${id}');sv();draw()">✕</button></div>`}).join('')||'<p class="mt">لا توجد تخصصات مفضلة.</p>'}
 function mv(i,j){const W=ST.w[B];if(j<0||j>=W.length||i===null)return;W.splice(j,0,W.splice(i,1)[0]);sv();wl()}
 function rm(i){ST.w[B].splice(i,1);sv();draw()}
 function clr(){if(ST.w[B].length&&confirm('تفريغ جميع الرغبات؟')){ST.w[B]=[];sv();draw()}}
